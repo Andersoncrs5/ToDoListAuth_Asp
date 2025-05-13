@@ -1,0 +1,6 @@
+@TodoListJwt_HostAddress = http://localhost:5110
+
+GET {{TodoListJwt_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
