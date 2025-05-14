@@ -5,10 +5,11 @@ using System.Threading.Tasks;
 
 namespace TodoListJwt.utils
 {
-    public class Response
+    public class Response<T>
     {
         public string? Status { get; set; }
         public string? Message { get; set; }
         public int? Code { get; set; }
+        public T? data { get; set; }
     }
 }

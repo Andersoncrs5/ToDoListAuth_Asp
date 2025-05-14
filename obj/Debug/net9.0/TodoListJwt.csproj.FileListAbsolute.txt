@@ -145,3 +145,6 @@
 /home/anderson/Desktop/c#/asp_core/api/projects/TodoListJwt/obj/Debug/net9.0/TodoListJwt.pdb
 /home/anderson/Desktop/c#/asp_core/api/projects/TodoListJwt/obj/Debug/net9.0/TodoListJwt.genruntimeconfig.cache
 /home/anderson/Desktop/c#/asp_core/api/projects/TodoListJwt/obj/Debug/net9.0/ref/TodoListJwt.dll
+/home/anderson/Desktop/c#/asp_core/api/projects/TodoListJwt/obj/Debug/net9.0/TodoListJwt.sourcelink.json
+/home/anderson/Desktop/c#/asp_core/api/projects/TodoListJwt/bin/Debug/net9.0/Castle.Core.dll
+/home/anderson/Desktop/c#/asp_core/api/projects/TodoListJwt/bin/Debug/net9.0/Microsoft.EntityFrameworkCore.Proxies.dll

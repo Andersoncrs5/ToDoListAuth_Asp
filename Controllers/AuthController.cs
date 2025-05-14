@@ -38,6 +38,9 @@ namespace TodoListJwt.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
+            if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
+
             string email = model.Email.Trim();
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(model.Password))
                 return BadRequest("Email and Password must be provided.");
@@ -89,6 +92,9 @@ namespace TodoListJwt.Controllers
         {
             try 
             {
+                if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
+
                 string email = model.Email.Trim().ToLower();
 
                 if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(model.Password))
@@ -99,7 +105,7 @@ namespace TodoListJwt.Controllers
                 if (userExists != null)
                 {
                     return StatusCode(StatusCodes.Status400BadRequest,
-                        new Response { Status = "Error", Message = "User already exists.", Code = 400 });
+                        new Response<string> { Status = "Error", Message = "User already exists.", Code = 400 });
                 }
 
                 ApplicationUser? user = new ApplicationUser
@@ -118,11 +124,12 @@ namespace TodoListJwt.Controllers
                     {
                         Status = "Error",
                         Message = "User creation failed.",
-                        Errors = errors
+                        Errors = errors,
+                        Code = 400
                     });
                 }
 
-                return Ok(new Response { Status = "Success", Message = "User created successfully." });
+                return Ok(new Response<string> { Code = 201, Status = "Success", Message = "User created successfully." });
             }
             catch (Exception e)
             {
@@ -133,6 +140,9 @@ namespace TodoListJwt.Controllers
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] TokenDto tokenModel)
         {
+            if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
+
             if (tokenModel is null || string.IsNullOrWhiteSpace(tokenModel.AcessToken) || string.IsNullOrWhiteSpace(tokenModel.RefreshToken))
                 return BadRequest("Invalid client request");
 
@@ -169,6 +179,7 @@ namespace TodoListJwt.Controllers
         [Route("revoke/{email}")]
         public async Task<IActionResult> Revoke(string email)
         {
+                    
             ApplicationUser? user = await this._userManager.FindByEmailAsync(email);
 
             if (user == null) return BadRequest("Invalid email");

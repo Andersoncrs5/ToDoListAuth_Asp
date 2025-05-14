@@ -7,7 +7,11 @@ using Microsoft.OpenApi.Models;
 using SignInApi.Services.IServices;
 using TodoListJwt.Context;
 using TodoListJwt.entities;
+using TodoListJwt.SetRepositories.IRepositories;
+using TodoListJwt.SetRepositories.Repositories;
 using TodoListJwt.SetServices.Services;
+using TodoListJwt.SetUnitOfWork;
+using TodoListJwt.utils;
 
 WebApplicationBuilder? builder = WebApplication.CreateBuilder(args);
 
@@ -102,6 +106,9 @@ builder.Services.AddCors(options =>
 
 // builder.Services.AddScoped<IUsersRepository, UsersRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 WebApplication? app = builder.Build();
 
@@ -110,6 +117,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseCors("AllowAllOrigins");
 
