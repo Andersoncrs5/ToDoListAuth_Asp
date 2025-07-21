@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,7 +15,8 @@ using TodoListJwt.utils;
 namespace TodoListJwt.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion("1.0")]
     public class TaskController : ControllerBase
     {
         private readonly IUnitOfWork _uow;
@@ -26,6 +28,7 @@ namespace TodoListJwt.Controllers
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost]
+        [EnableRateLimiting("fixedWindowLimiterPolicy")]
         public async Task<IActionResult> Create([FromBody] TaskDto taskDto)
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
@@ -43,6 +46,7 @@ namespace TodoListJwt.Controllers
         
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPut("{Id:long}")]
+        [EnableRateLimiting("fixedWindowLimiterPolicy")]
         public async Task<IActionResult> Update(long Id, [FromBody] TaskDto taskDto)
         {
             if (!ModelState.IsValid)
@@ -63,6 +67,7 @@ namespace TodoListJwt.Controllers
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("{id:long}")]
+        [EnableRateLimiting("SlidingWindowLimiterPolicy")]
         public async Task<ActionResult> Get(long id) 
         {
             TaskEntity task = await _uow.TaskRepository.Get(id);
@@ -78,6 +83,7 @@ namespace TodoListJwt.Controllers
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [HttpDelete("{id:long}")]
         public async Task<ActionResult> Delete(long id) 
         {
@@ -95,6 +101,7 @@ namespace TodoListJwt.Controllers
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("/ChangeStatusDone/{id:long}")]
+        [EnableRateLimiting("fixedWindowLimiterPolicy")]
         public async Task<ActionResult> ChangeStatusDone(long id) 
         {
             bool status = await _uow.TaskRepository.ChangeStatusDone(id);
@@ -110,6 +117,7 @@ namespace TodoListJwt.Controllers
         }
 
         [HttpGet]
+        [EnableRateLimiting("SlidingWindowLimiterPolicy")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult> GetAllByUser([FromQuery] PaginationQuery query)
         {
