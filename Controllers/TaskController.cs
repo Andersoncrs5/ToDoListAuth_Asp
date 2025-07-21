@@ -33,7 +33,8 @@ namespace TodoListJwt.Controllers
         public async Task<IActionResult> Create([FromBody] TaskDto taskDto)
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
-            TaskEntity task = await this._uow.TaskRepository.Create(taskDto, id);
+            ApplicationUser user = await _uow.UserRepository.Get(id);
+            TaskEntity task = await this._uow.TaskRepository.Create(taskDto, user);
 
             return Ok(new Response<TaskEntity>
             {
@@ -88,7 +89,8 @@ namespace TodoListJwt.Controllers
         [HttpDelete("{id:long}")]
         public async Task<ActionResult> Delete(long id) 
         {
-            await _uow.TaskRepository.Delete(id);
+            TaskEntity task = await _uow.TaskRepository.Get(id);
+            await _uow.TaskRepository.Delete(task);
 
             return Ok( new Response<string>
                 {
@@ -105,7 +107,8 @@ namespace TodoListJwt.Controllers
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
         public async Task<ActionResult> ChangeStatusDone(long id) 
         {
-            bool status = await _uow.TaskRepository.ChangeStatusDone(id);
+            TaskEntity task = await _uow.TaskRepository.Get(id);
+            bool status = await _uow.TaskRepository.ChangeStatusDone(task);
 
             return Ok( new Response<string>
                 {
@@ -123,8 +126,9 @@ namespace TodoListJwt.Controllers
         public async Task<ActionResult> GetAllByUser([FromQuery] PaginationQuery query)
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
+            ApplicationUser user = await _uow.UserRepository.Get(id);
 
-            var tasks = await this._uow.TaskRepository.GetAllByUser(id, query.PageNumber, query.PageSize);
+            var tasks = await this._uow.TaskRepository.GetAllByUser(user, query.PageNumber, query.PageSize);
 
             return Ok(tasks);
         }
