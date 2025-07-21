@@ -14,11 +14,9 @@ namespace TodoListJwt.SetRepositories.Repositories
 {
     public class TaskRepository: ITaskRepository
     {
-        private readonly IUserRepository _userRepository;
         private readonly AppDbContext _context;
-        public TaskRepository(IUserRepository userRepository, AppDbContext context)
+        public TaskRepository(AppDbContext context)
         {
-            _userRepository = userRepository;
             _context = context;
         }
 
@@ -36,18 +34,16 @@ namespace TodoListJwt.SetRepositories.Repositories
             return task;
         }
 
-        public async Task<TaskEntity> Create(TaskDto taskDto , string? userId) 
+        public async Task<TaskEntity> Create(TaskDto taskDto , ApplicationUser user) 
         {
-            ApplicationUser user = await this._userRepository.Get(userId);
-
             TaskEntity task = taskDto.toTaskEntity();
 
             task.User = user;
             task.CreatedAt = DateTime.UtcNow;
-            task.UserId = userId!;
+            task.UserId = user.Id!;
 
-            var created = await this._context.AddAsync(task);
-            await this._context.SaveChangesAsync();
+            var created = await _context.AddAsync(task);
+            await _context.SaveChangesAsync();
 
             return created.Entity;
         }
@@ -67,18 +63,14 @@ namespace TodoListJwt.SetRepositories.Repositories
             return task;
         }
 
-        public async Task Delete(long? taskId)
+        public async Task Delete(TaskEntity task)
         {
-            TaskEntity task = await this.Get(taskId);
-
-            this._context.Tasks.Remove(task);
+            _context.Tasks.Remove(task);
             await _context.SaveChangesAsync();
         }
 
-        public async Task<bool> ChangeStatusDone(long? taskId)
+        public async Task<bool> ChangeStatusDone(TaskEntity task)
         {
-            TaskEntity task = await this.Get(taskId);
-
             task.Done = !task.Done;
 
             _context.Entry(task).State = EntityState.Modified;
@@ -88,14 +80,12 @@ namespace TodoListJwt.SetRepositories.Repositories
         }
 
         public async Task<PaginatedList<TaskEntity>> GetAllByUser(
-            string? userId, int pageNumber = 1, int pageSize = 10 
+            ApplicationUser user, int pageNumber = 1, int pageSize = 10 
         )
         {
-            ApplicationUser user = await this._userRepository.Get(userId);
-
             IQueryable<TaskEntity> query = _context.Tasks
                 .AsNoTracking()
-                .Where(t => t.UserId == userId!);
+                .Where(t => t.UserId == user.Id!);
 
             return await PaginatedList<TaskEntity>.CreateAsync(query, pageNumber, pageSize);
         }

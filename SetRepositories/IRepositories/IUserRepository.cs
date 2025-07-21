@@ -10,7 +10,7 @@ namespace TodoListJwt.SetRepositories.IRepositories
     public interface IUserRepository
     {
         Task<ApplicationUser> Get(string? id);
-        Task Delete(string? id);
-        Task<ApplicationUser> Update(string? Id, UpdateUserDto userDto);
+        Task Delete(ApplicationUser user);
+        Task<ApplicationUser> Update(ApplicationUser user, UpdateUserDto userDto);
     }
 }

@@ -52,8 +52,9 @@ namespace TodoListJwt.Controllers
         public async Task<ActionResult> Delete() 
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
+            ApplicationUser user = await _uow.UserRepository.Get(id);
 
-            await this._uow.UserRepository.Delete(id);
+            await this._uow.UserRepository.Delete(user);
 
             return Ok(new Response<ApplicationUser> 
             {
@@ -72,14 +73,15 @@ namespace TodoListJwt.Controllers
                     return BadRequest(ModelState);
 
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
-            ApplicationUser user = await _uow.UserRepository.Update(id, userDto);
+            ApplicationUser user = await _uow.UserRepository.Get(id);
+            ApplicationUser data = await _uow.UserRepository.Update(user, userDto);
 
             return Ok(
                 new UserResponse 
                 {   
-                    Id = user.Id,
-                    Name = user.UserName!,
-                    Email = user.Email!
+                    Id = data.Id,
+                    Name = data.UserName!,
+                    Email = data.Email!
                 }
             );
 

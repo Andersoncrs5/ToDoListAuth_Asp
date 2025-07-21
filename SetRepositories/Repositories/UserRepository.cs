@@ -27,7 +27,7 @@ namespace TodoListJwt.SetRepositories.Repositories
             if (string.IsNullOrEmpty(id) || id == null ) 
                 throw new ResponseException("Id is required", 400, "failed");
             
-            ApplicationUser? user = await this._userManager.FindByIdAsync(id);
+            ApplicationUser? user = await _userManager.FindByIdAsync(id);
 
             if (user == null) 
                 throw new ResponseException("User not found", 404, "failed");
@@ -35,15 +35,16 @@ namespace TodoListJwt.SetRepositories.Repositories
             return user;
         }
 
-        public async Task Delete(string? id) {
-            ApplicationUser user = await this.Get(id);
-            
-            await this._userManager.DeleteAsync(user);
+        public async Task Delete(ApplicationUser user) 
+        {
+            if (string.IsNullOrEmpty(user.Id))
+                throw new ResponseException("Id is required", 400, "failed");
+
+            await _userManager.DeleteAsync(user);
         }
 
-        public async Task<ApplicationUser> Update(string? id, UpdateUserDto userDto) {
-            ApplicationUser user = await this.Get(id);
-
+        public async Task<ApplicationUser> Update(ApplicationUser user, UpdateUserDto userDto) 
+        {
             user.UserName = userDto.Name.Trim();
             if (!string.IsNullOrWhiteSpace(userDto.Password))
             {
@@ -56,7 +57,6 @@ namespace TodoListJwt.SetRepositories.Repositories
             if (!result.Succeeded)
             {
                 var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-                Console.WriteLine($"Erro ao atualizar usuário: {errors}");
                 throw new ResponseException("Update failed", 500, "failed");
             }
 

@@ -28,7 +28,7 @@ namespace TodoListJwt.SetUnitOfWork
             => _userRepository ??= new UserRepository(_context, _userManager);
 
         public ITaskRepository TaskRepository 
-            => _taskRepository ??= new TaskRepository(UserRepository, _context);
+            => _taskRepository ??= new TaskRepository(_context);
 
         public async Task Commit()
         {
