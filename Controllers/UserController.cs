@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TodoListJwt.DTOs.user;
 using TodoListJwt.entities;
 using TodoListJwt.SetUnitOfWork;
@@ -15,7 +16,8 @@ using TodoListJwt.utils;
 namespace TodoListJwt.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public class UserController : ControllerBase
     {
         private readonly IUnitOfWork _uow;
@@ -25,11 +27,11 @@ namespace TodoListJwt.Controllers
             _uow = uow;
         }
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("me")]
+        [EnableRateLimiting("SlidingWindowLimiterPolicy")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult> Me() 
         {
-
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
 
             ApplicationUser user = await _uow.UserRepository.Get(id);
@@ -45,6 +47,7 @@ namespace TodoListJwt.Controllers
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [HttpDelete]
         public async Task<ActionResult> Delete() 
         {
@@ -61,6 +64,7 @@ namespace TodoListJwt.Controllers
         }
 
         [HttpPut]
+        [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult> Update([FromBody] UpdateUserDto userDto) 
         {
@@ -68,7 +72,7 @@ namespace TodoListJwt.Controllers
                     return BadRequest(ModelState);
 
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
-            ApplicationUser user = await this._uow.UserRepository.Update(id, userDto);
+            ApplicationUser user = await _uow.UserRepository.Update(id, userDto);
 
             return Ok(
                 new UserResponse 

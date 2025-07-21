@@ -12,6 +12,7 @@ using TodoListJwt.entities;
 using TodoListJwt.DTOs.user;
 using TodoListJwt.utils;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace TodoListJwt.Controllers
 {
