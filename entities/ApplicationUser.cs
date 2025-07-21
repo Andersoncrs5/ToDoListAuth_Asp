@@ -13,7 +13,6 @@ namespace TodoListJwt.entities
         public string? RefreshToken { get; set; }
         public DateTime RefreshTokenExpiryTime { get; set; }
 
-        // [Required]
         [JsonIgnore]
         public virtual ICollection<TaskEntity> Tasks { get; set; } = new List<TaskEntity>();
 
