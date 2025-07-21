@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TodoListJwt")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d14176d66f20e2032baa9fab55562c9426f2132b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+91f07f7b60a0f8af5b4a5b55c8380dde24763335")]
 [assembly: System.Reflection.AssemblyProductAttribute("TodoListJwt")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TodoListJwt")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
