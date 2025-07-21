@@ -12,6 +12,11 @@ using TodoListJwt.SetRepositories.Repositories;
 using TodoListJwt.SetServices.Services;
 using TodoListJwt.SetUnitOfWork;
 using TodoListJwt.utils;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.AspNetCore.Builder;
+using System.Net;
+using System.Threading.RateLimiting; 
 
 WebApplicationBuilder? builder = WebApplication.CreateBuilder(args);
 
@@ -49,7 +54,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
-
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -91,6 +95,55 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
+
+builder.Services.AddRateLimiter(RateLimiterOptions => 
+{
+    RateLimiterOptions.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+        await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.");
+    };
+
+    RateLimiterOptions.AddSlidingWindowLimiter("SlidingWindowLimiterPolicy", options => 
+    {
+        options.PermitLimit = 20;
+        options.Window = TimeSpan.FromSeconds(10);
+        options.SegmentsPerWindow = 2;
+        options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        options.QueueLimit = 0;
+    });
+
+    RateLimiterOptions.AddFixedWindowLimiter("fixedWindowLimiterPolicy", options =>
+    {
+        options.PermitLimit = 10;
+        options.Window = TimeSpan.FromSeconds(8);
+        options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        options.QueueLimit = 0;
+    });
+
+    RateLimiterOptions.AddFixedWindowLimiter("authSystemPolicy", options => 
+    {
+        options.PermitLimit = 6;
+        options.Window = TimeSpan.FromSeconds(16);
+        options.QueueLimit = 0;
+    });
+
+});
+
+builder.Services.AddApiVersioning(options => 
+{
+    options.ReportApiVersions = true;
+    options.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1,0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ApiVersionReader = new UrlSegmentApiVersionReader();
+});
+
+builder.Services.AddVersionedApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 
 builder.Services.AddControllers();
 

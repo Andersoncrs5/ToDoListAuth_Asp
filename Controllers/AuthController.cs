@@ -11,11 +11,16 @@ using SignInApi.Services.IServices;
 using TodoListJwt.entities;
 using TodoListJwt.DTOs.user;
 using TodoListJwt.utils;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace TodoListJwt.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion("1.0")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [EnableRateLimiting("AdmSystemPolicy")]
     public class AuthController : ControllerBase
     {
         private readonly ITokenService _tokenService;

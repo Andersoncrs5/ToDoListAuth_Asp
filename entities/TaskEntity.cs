@@ -14,14 +14,10 @@ namespace TodoListJwt.entities
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public long Id { get; set; }
 
-        [Required]
-        [StringLength(100)]
         public string Title { get; set; } = string.Empty;
 
-        [StringLength(500)]
         public string? Description { get; set; } = string.Empty;
 
-        [Required]
         public bool Done { get; set; } = false;
 
         [Required]
