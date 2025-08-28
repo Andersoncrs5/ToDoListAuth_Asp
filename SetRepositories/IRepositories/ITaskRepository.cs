@@ -15,6 +15,6 @@ namespace TodoListJwt.SetRepositories.IRepositories
         Task<TaskEntity?> Get(long taskId);
         Task Delete(TaskEntity task);
         Task<TaskEntity> ChangeStatusDone(TaskEntity task);
-        Task<PaginatedList<TaskEntity>> GetAllByUser(ApplicationUser user, int pageNumber = 1, int pageSize = 10 );
+        Task<PaginatedList<TaskEntity>> GetAllByUser(ApplicationUser user, DateTime? createAtBefore, DateTime? createAtAfter, string? Title, bool? Done,int pageNumber = 1, int pageSize = 10 );
     }
 }

@@ -251,7 +251,13 @@ namespace TodoListJwt.Controllers
         [HttpGet]
         [EnableRateLimiting("SlidingWindowLimiterPolicy")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<ActionResult> GetAllByUser([FromQuery] PaginationQuery query)
+        public async Task<ActionResult> GetAllByUser(
+            [FromQuery] PaginationQuery query,
+            [FromQuery] string? Title,
+            [FromQuery] bool? Done,
+            [FromQuery] DateTime? createAtBefore,
+            [FromQuery] DateTime? createAtAfter
+            )
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
 
@@ -279,7 +285,7 @@ namespace TodoListJwt.Controllers
                 });
             }
 
-            PaginatedList<TaskEntity> tasks = await _uow.TaskRepository.GetAllByUser(user, query.PageNumber, query.PageSize);
+            PaginatedList<TaskEntity> tasks = await _uow.TaskRepository.GetAllByUser(user, createAtBefore, createAtAfter, Title, Done,query.PageNumber, query.PageSize);
 
             return Ok(tasks);
         }

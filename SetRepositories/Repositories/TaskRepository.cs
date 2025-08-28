@@ -20,16 +20,16 @@ namespace TodoListJwt.SetRepositories.Repositories
             _context = context;
         }
 
-        public async Task<TaskEntity> Get(long? taskId)
+        public async Task<TaskEntity?> Get(long taskId)
         {
-            if (taskId == null || taskId <= 0) 
-                throw new ResponseException("Id of task is required", 400, "failed");
+            if (long.IsNegative(taskId) || taskId == 0 )
+                throw new ArgumentNullException(nameof(taskId));
 
-            TaskEntity? task = await this._context.Tasks
+            TaskEntity? task = await _context.Tasks
                 .AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId);
 
-            if (task == null) 
-                throw new ResponseException("User not found", 404, "failed");
+            if (task == null)
+                return null;
 
             return task;
         }
@@ -48,10 +48,8 @@ namespace TodoListJwt.SetRepositories.Repositories
             return created.Entity;
         }
 
-        public async Task<TaskEntity> Update(TaskDto taskDto , long? taskId) 
+        public async Task<TaskEntity> Update(TaskDto taskDto , TaskEntity task) 
         {
-            TaskEntity task = await this.Get(taskId);
-
             task.Title = taskDto.Title;
             task.Description = taskDto.Description;
             task.Done = taskDto.Done;
@@ -69,26 +67,53 @@ namespace TodoListJwt.SetRepositories.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task<bool> ChangeStatusDone(TaskEntity task)
+        public async Task<TaskEntity> ChangeStatusDone(TaskEntity task)
         {
             task.Done = !task.Done;
 
             _context.Entry(task).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            return task.Done;
+            return task;
         }
 
         public async Task<PaginatedList<TaskEntity>> GetAllByUser(
-            ApplicationUser user, int pageNumber = 1, int pageSize = 10 
+            ApplicationUser user, 
+            DateTime? createAtBefore, 
+            DateTime? createAtAfter, 
+            string? title,
+            bool? done,
+            int pageNumber = 1, 
+            int pageSize = 10
         )
         {
             IQueryable<TaskEntity> query = _context.Tasks
                 .AsNoTracking()
                 .Where(t => t.UserId == user.Id!);
 
+            if (createAtBefore.HasValue)
+            {
+                query = query.Where(t => t.CreatedAt <= createAtBefore.Value);
+            }
+
+            if (createAtAfter.HasValue)
+            {
+                query = query.Where(t => t.CreatedAt >= createAtAfter.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                query = query.Where(t => t.Title.Contains(title));
+            }
+
+            if (done.HasValue)
+            {
+                query = query.Where(t => t.Done == done.Value);
+            }
+
             return await PaginatedList<TaskEntity>.CreateAsync(query, pageNumber, pageSize);
         }
+
 
     }
 }
