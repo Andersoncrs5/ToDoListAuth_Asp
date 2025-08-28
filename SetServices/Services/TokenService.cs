@@ -44,7 +44,7 @@ namespace TodoListJwt.SetServices.Services
 
         public string GenerateRefreshToken()
         {
-            byte[]? secureRandomBytes = new byte[128];
+            byte[]? secureRandomBytes = new byte[256];
 
             using RandomNumberGenerator? randomNumberGenerator = RandomNumberGenerator.Create();
 
