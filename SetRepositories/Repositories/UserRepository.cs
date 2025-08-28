@@ -23,14 +23,14 @@ namespace TodoListJwt.SetRepositories.Repositories
             _userManager = userManager;
         }
 
-        public async Task<ApplicationUser> Get(string? id) {
-            if (string.IsNullOrEmpty(id) || id == null ) 
-                throw new ResponseException("Id is required", 400, "failed");
-            
+        public async Task<ApplicationUser?> Get(string id) {
+            if (string.IsNullOrEmpty(id))
+                throw new ArgumentNullException(nameof(id));
+
             ApplicationUser? user = await _userManager.FindByIdAsync(id);
 
-            if (user == null) 
-                throw new ResponseException("User not found", 404, "failed");
+            if (user == null)
+                return null;
 
             return user;
         }
@@ -38,7 +38,7 @@ namespace TodoListJwt.SetRepositories.Repositories
         public async Task Delete(ApplicationUser user) 
         {
             if (string.IsNullOrEmpty(user.Id))
-                throw new ResponseException("Id is required", 400, "failed");
+                throw new ArgumentNullException(nameof(user));
 
             await _userManager.DeleteAsync(user);
         }
