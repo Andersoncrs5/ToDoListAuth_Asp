@@ -10,11 +10,11 @@ namespace TodoListJwt.SetRepositories.IRepositories
 {
     public interface ITaskRepository
     {
-        Task<TaskEntity> Create(TaskDto task , ApplicationUser user);
-        Task<TaskEntity> Update(TaskDto task , long? taskId);
-        Task<TaskEntity> Get(long? taskId);
+        Task<TaskEntity> Create(TaskDto taskDto, ApplicationUser user);
+        Task<TaskEntity> Update(TaskDto taskDto , TaskEntity task);
+        Task<TaskEntity?> Get(long taskId);
         Task Delete(TaskEntity task);
-        Task<bool> ChangeStatusDone(TaskEntity task);
+        Task<TaskEntity> ChangeStatusDone(TaskEntity task);
         Task<PaginatedList<TaskEntity>> GetAllByUser(ApplicationUser user, int pageNumber = 1, int pageSize = 10 );
     }
 }
