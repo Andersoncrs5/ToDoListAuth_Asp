@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,15 +24,20 @@ namespace TodoListJwt.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUnitOfWork _uow;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public UserController(IUnitOfWork uow)
+        public UserController(IUnitOfWork uow, UserManager<ApplicationUser> userManager)
         {
             _uow = uow;
+            _userManager = userManager;
         }
 
         [HttpGet("me")]
         [EnableRateLimiting("SlidingWindowLimiterPolicy")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [ProducesResponseType(typeof(ResponseBody<UserResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         public async Task<ActionResult> Me() 
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
@@ -77,6 +83,9 @@ namespace TodoListJwt.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [HttpDelete]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status200OK)]
         public async Task<ActionResult> Delete() 
         {
             string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
@@ -86,7 +95,7 @@ namespace TodoListJwt.Controllers
                 return Unauthorized(new ResponseBody<string>{
                     Body = null,
                     Message = "you are not logged in",
-                    Success = true,
+                    Success = false,
                     Timestamp = DateTimeOffset.Now,
                     StatusCode = 401,
                 });
@@ -119,6 +128,11 @@ namespace TodoListJwt.Controllers
         [HttpPut]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ResponseBody<UserResponse>), StatusCodes.Status200OK)]
         public async Task<ActionResult> Update([FromBody] UpdateUserDto userDto) 
         {
             if (!ModelState.IsValid)
@@ -139,7 +153,7 @@ namespace TodoListJwt.Controllers
                     StatusCode = 401,
                 });
             }
-
+    
             ApplicationUser? user = await _uow.UserRepository.Get(id);
 
             if (user == null) 
@@ -150,6 +164,20 @@ namespace TodoListJwt.Controllers
                     Success = false,
                     Timestamp = DateTimeOffset.Now,
                     StatusCode = 404,
+                });
+            }
+
+            ApplicationUser? nameCheck = await _userManager.FindByNameAsync(userDto.Name);
+
+            if (nameCheck != null && nameCheck.Id != user.Id)
+            {
+                return StatusCode(StatusCodes.Status409Conflict, new ResponseBody<string>
+                {
+                    Body = null,
+                    Message = "Name already exists.",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = StatusCodes.Status409Conflict,
                 });
             }
 

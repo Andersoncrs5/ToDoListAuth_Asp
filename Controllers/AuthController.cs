@@ -21,7 +21,6 @@ namespace TodoListJwt.Controllers
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]
     [ApiVersion("1.0")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     [EnableRateLimiting("AdmSystemPolicy")]
     public class AuthController : ControllerBase
     {
@@ -43,6 +42,10 @@ namespace TodoListJwt.Controllers
         }
 
         [HttpPost("login")]
+        [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<Tokens>), StatusCodes.Status200OK)]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
             if (!ModelState.IsValid)
@@ -123,6 +126,13 @@ namespace TodoListJwt.Controllers
         }
 
         [HttpPost("register")]
+        [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<IEnumerable<string>>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Register([FromBody] CreateUserDto model)
         {
             try 
@@ -221,6 +231,9 @@ namespace TodoListJwt.Controllers
         }
 
         [HttpPost("refresh-token")]
+        [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<Tokens>), StatusCodes.Status200OK)]
         public async Task<IActionResult> RefreshToken([FromBody] TokenDto tokenModel)
         {
             if (!ModelState.IsValid)
@@ -285,30 +298,52 @@ namespace TodoListJwt.Controllers
             user.RefreshToken = newRefreshToken;
             await _userManager.UpdateAsync(user);
 
-            return Ok(new Tokens
+            return Ok(new ResponseBody<Tokens>
             {
-                Token = new JwtSecurityTokenHandler().WriteToken(newAccessToken),
-                RefreshToken = newRefreshToken,
-                ExpirationToken = newAccessToken.ValidTo
+                Body = new Tokens
+                {
+                    Token = new JwtSecurityTokenHandler().WriteToken(newAccessToken),
+                    RefreshToken = newRefreshToken,
+                    ExpirationToken = newAccessToken.ValidTo
+                },
+                Message = "Token created",
+                Success = true,
+                Timestamp = DateTimeOffset.Now,
+                StatusCode = 200,
             });
         }
 
-        [Authorize]
         [HttpPost]
-        [Route("revoke/{email}")]
-        public async Task<IActionResult> Revoke(string email)
+        [Route("revoke")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> Revoke()
         {
-                    
-            ApplicationUser? user = await this._userManager.FindByEmailAsync(email);
+            string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
 
-            if (user == null)
+            if (string.IsNullOrWhiteSpace(id)) 
             {
-                return BadRequest(new ResponseBody<string>{
+                return Unauthorized(new ResponseBody<string>{
                     Body = null,
-                    Message = "Invalid email",
+                    Message = "you are not logged in",
                     Success = false,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 400,
+                    StatusCode = 401,
+                });
+            }
+
+            ApplicationUser? user = await _userManager.FindByIdAsync(id);
+
+            if (user == null) 
+            {
+                return NotFound(new ResponseBody<string>{
+                    Body = null,
+                    Message = "User not found",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = 404,
                 });
             }
 

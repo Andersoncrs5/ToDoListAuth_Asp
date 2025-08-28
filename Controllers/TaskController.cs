@@ -32,6 +32,10 @@ namespace TodoListJwt.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPost]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
+        [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status201Created)]
         public async Task<IActionResult> Create([FromBody] TaskDto taskDto)
         {
             if (!ModelState.IsValid)
@@ -81,6 +85,10 @@ namespace TodoListJwt.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpPut("{Id:long}")]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
+        [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status200OK)]
         public async Task<IActionResult> Update(long Id, [FromBody] TaskDto taskDto)
         {
             if (!ModelState.IsValid)
@@ -127,6 +135,9 @@ namespace TodoListJwt.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("{Id:long}")]
         [EnableRateLimiting("SlidingWindowLimiterPolicy")]
+        [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         public async Task<ActionResult> Get(long Id) 
         {
             if (Id <= 0) 
@@ -167,6 +178,9 @@ namespace TodoListJwt.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [HttpDelete("{Id:long}")]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status200OK)]
         public async Task<ActionResult> Delete(long Id) 
         {
             if (Id <= 0) 
@@ -209,6 +223,9 @@ namespace TodoListJwt.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         [HttpGet("/ChangeStatusDone/{Id:long}")]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status200OK)]
         public async Task<ActionResult> ChangeStatusDone(long Id) 
         {
             if (Id <= 0) 
@@ -251,6 +268,9 @@ namespace TodoListJwt.Controllers
         [HttpGet]
         [EnableRateLimiting("SlidingWindowLimiterPolicy")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<PaginatedList<TaskEntity>>), StatusCodes.Status200OK)]
         public async Task<ActionResult> GetAllByUser(
             [FromQuery] PaginationQuery query,
             [FromQuery] string? Title,
@@ -287,7 +307,14 @@ namespace TodoListJwt.Controllers
 
             PaginatedList<TaskEntity> tasks = await _uow.TaskRepository.GetAllByUser(user, createAtBefore, createAtAfter, Title, Done,query.PageNumber, query.PageSize);
 
-            return Ok(tasks);
+            return Ok(new ResponseBody<PaginatedList<TaskEntity>>
+            {
+                Body = tasks,
+                Message = "All tasks",
+                Success = true,
+                Timestamp = DateTimeOffset.Now,
+                StatusCode = 200,
+            });
         }
 
         private ResponseBody<ValidationErrors> CreateErrorResponse(ModelStateDictionary modelState)
