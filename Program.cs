@@ -62,7 +62,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "My API",
         Version = "v1",
-        Description = "API for system of sign-in with Swagger and PostgreSQL",
+        Description = "API for system of todolist with sign-in with PostgreSQL",
         Contact = new OpenApiContact
         {
             Name = "Anderson",
