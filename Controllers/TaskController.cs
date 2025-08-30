@@ -36,50 +36,66 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Create([FromBody] TaskDto taskDto)
         {
-            if (!ModelState.IsValid)
+            try 
             {
-                ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
-                return BadRequest(errorResponse);
-            }
+                if (!ModelState.IsValid)
+                {
+                    ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
+                    return BadRequest(errorResponse);
+                }
+                
+                string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
+
+                if (string.IsNullOrWhiteSpace(id)) 
+                {
+                    return Unauthorized(new ResponseBody<string>{
+                        Body = null,
+                        Message = "you are not logged in",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 401,
+                    });
+                }
+
+                ApplicationUser? user = await _uow.UserRepository.Get(id);
+
+                if (user == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "User not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                TaskEntity task = await _uow.TaskRepository.Create(taskDto, user);
+
+                return StatusCode(StatusCodes.Status201Created, new ResponseBody<TaskEntity>
+                {
+                    Body = task,
+                    Message = "Task created with successfully",
+                    Success = true,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = 200,
+                });    
             
-            string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
-
-            if (string.IsNullOrWhiteSpace(id)) 
+            }
+            catch (Exception e)
             {
-                return Unauthorized(new ResponseBody<string>{
-                    Body = null,
-                    Message = "you are not logged in",
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to create task! Please try again later",
                     Success = false,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 401,
+                    StatusCode = StatusCodes.Status500InternalServerError,
                 });
             }
-
-            ApplicationUser? user = await _uow.UserRepository.Get(id);
-
-            if (user == null) 
-            {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "User not found",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            TaskEntity task = await _uow.TaskRepository.Create(taskDto, user);
-
-            return StatusCode(StatusCodes.Status201Created, new ResponseBody<TaskEntity>
-            {
-                Body = task,
-                Message = "Task created with successfully",
-                Success = true,
-                Timestamp = DateTimeOffset.Now,
-                StatusCode = 200,
-            });    
         }
         
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -89,47 +105,63 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Update(long Id, [FromBody] TaskDto taskDto)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
-                return BadRequest(errorResponse);
-            }
+                if (!ModelState.IsValid)
+                {
+                    ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
+                    return BadRequest(errorResponse);
+                }
 
-            if (Id <= 0) 
+                if (Id <= 0) 
+                {
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Id is required",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                TaskEntity? task = await _uow.TaskRepository.Get(Id);
+
+                if (task == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Task not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                TaskEntity taskUpdated = await _uow.TaskRepository.Update(taskDto, task);
+
+                return Ok(new ResponseBody<TaskEntity>{
+                    Body = taskUpdated,
+                    Message = "Task updated with successfully",
+                    Success = true,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = 200,
+                });
+            }
+            catch (Exception e)
             {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Id is required",
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to update task! Please try again later",
                     Success = false,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
+                    StatusCode = StatusCodes.Status500InternalServerError,
                 });
             }
 
-            TaskEntity? task = await _uow.TaskRepository.Get(Id);
-
-            if (task == null) 
-            {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Task not found",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            TaskEntity taskUpdated = await _uow.TaskRepository.Update(taskDto, task);
-
-            return Ok(new ResponseBody<TaskEntity>{
-                Body = taskUpdated,
-                Message = "Task updated with successfully",
-                Success = true,
-                Timestamp = DateTimeOffset.Now,
-                StatusCode = 200,
-            });
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -138,41 +170,56 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> Get(long Id) 
         {
-            if (Id <= 0) 
+            try
             {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Id is required",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            TaskEntity? task = await _uow.TaskRepository.Get(Id);
-
-            if (task == null) 
-            {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Task not found",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            return Ok(new ResponseBody<TaskEntity>
+                if (Id <= 0) 
                 {
-                    Body = task,
-                    Message = "Task found with successfully",
-                    Success = true,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 200,
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Id is required",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
                 }
-            );
+
+                TaskEntity? task = await _uow.TaskRepository.Get(Id);
+
+                if (task == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Task not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                return Ok(new ResponseBody<TaskEntity>
+                    {
+                        Body = task,
+                        Message = "Task found with successfully",
+                        Success = true,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 200,
+                    }
+                );
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to update task! Please try again later",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                });
+            }
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -181,88 +228,118 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> Delete(long Id) 
         {
-            if (Id <= 0) 
+            try 
             {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Id is required",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            TaskEntity? task = await _uow.TaskRepository.Get(Id);
-
-            if (task == null) 
-            {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Task not found",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            await _uow.TaskRepository.Delete(task);
-
-            return Ok(new ResponseBody<string>
+                if (Id <= 0) 
                 {
-                    Body = null,
-                    Message = "Task deleted with successfully",
-                    Success = true,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 200,
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Id is required",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
                 }
-            );
+
+                TaskEntity? task = await _uow.TaskRepository.Get(Id);
+
+                if (task == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Task not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                await _uow.TaskRepository.Delete(task);
+
+                return Ok(new ResponseBody<string>
+                    {
+                        Body = null,
+                        Message = "Task deleted with successfully",
+                        Success = true,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 200,
+                    }
+                );
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to get task! Please try again later",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                });
+            }
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        [HttpGet("/ChangeStatusDone/{Id:long}")]
+        [HttpGet("{Id:long}/status/done")]
         [EnableRateLimiting("fixedWindowLimiterPolicy")]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ResponseBody<TaskEntity>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> ChangeStatusDone(long Id) 
         {
-            if (Id <= 0) 
+            try
             {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Id is required",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            TaskEntity? task = await _uow.TaskRepository.Get(Id);
-
-            if (task == null) 
-            {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Task not found",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
-                });
-            }
-
-            TaskEntity taskChanged = await _uow.TaskRepository.ChangeStatusDone(task);
-
-            return Ok(new ResponseBody<TaskEntity>
+                if (Id <= 0) 
                 {
-                    Body = taskChanged,
-                    Message = "Task status changed with successfully",
-                    Success = true,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 200,
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Id is required",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
                 }
-            );
+
+                TaskEntity? task = await _uow.TaskRepository.Get(Id);
+
+                if (task == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Task not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                TaskEntity taskChanged = await _uow.TaskRepository.ChangeStatusDone(task);
+
+                return Ok(new ResponseBody<TaskEntity>
+                    {
+                        Body = taskChanged,
+                        Message = "Task status changed with successfully",
+                        Success = true,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 200,
+                    }
+                );
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to change status task! Please try again later",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                });
+            }
         }
 
         [HttpGet]
@@ -271,6 +348,7 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ResponseBody<PaginatedList<TaskEntity>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> GetAllByUser(
             [FromQuery] PaginationQuery query,
             [FromQuery] string? Title,
@@ -279,42 +357,56 @@ namespace TodoListJwt.Controllers
             [FromQuery] DateTime? createAtAfter
             )
         {
-            string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
-
-            if (string.IsNullOrWhiteSpace(id)) 
+            try 
             {
-                return Unauthorized(new ResponseBody<string>{
-                    Body = null,
-                    Message = "you are not logged in",
-                    Success = false,
+                string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
+
+                if (string.IsNullOrWhiteSpace(id)) 
+                {
+                    return Unauthorized(new ResponseBody<string>{
+                        Body = null,
+                        Message = "you are not logged in",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 401,
+                    });
+                }
+
+                ApplicationUser? user = await _uow.UserRepository.Get(id);
+
+                if (user == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "User not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                PaginatedList<TaskEntity> tasks = await _uow.TaskRepository.GetAllByUser(user, createAtBefore, createAtAfter, Title, Done,query.PageNumber, query.PageSize);
+
+                return Ok(new ResponseBody<PaginatedList<TaskEntity>>
+                {
+                    Body = tasks,
+                    Message = "All tasks",
+                    Success = true,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 401,
+                    StatusCode = 200,
                 });
             }
-
-            ApplicationUser? user = await _uow.UserRepository.Get(id);
-
-            if (user == null) 
+            catch (Exception e)
             {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "User not found",
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to change status task! Please try again later",
                     Success = false,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
+                    StatusCode = StatusCodes.Status500InternalServerError,
                 });
             }
-
-            PaginatedList<TaskEntity> tasks = await _uow.TaskRepository.GetAllByUser(user, createAtBefore, createAtAfter, Title, Done,query.PageNumber, query.PageSize);
-
-            return Ok(new ResponseBody<PaginatedList<TaskEntity>>
-            {
-                Body = tasks,
-                Message = "All tasks",
-                Success = true,
-                Timestamp = DateTimeOffset.Now,
-                StatusCode = 200,
-            });
         }
 
         private ResponseBody<ValidationErrors> CreateErrorResponse(ModelStateDictionary modelState)

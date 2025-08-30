@@ -46,83 +46,106 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ResponseBody<Tokens>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
-                return BadRequest(errorResponse);
-            }
-
-            string email = model.Email.Trim();
-
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(model.Password))
-            {
-                return BadRequest(new ResponseBody<string>
+                if (!ModelState.IsValid)
                 {
-                    Body = null,
-                    Message = "Email and Password must be provided.",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 400,
-                });
-            }
+                    ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
+                    return BadRequest(errorResponse);
+                }
 
-            ApplicationUser? user = await _userManager.FindByEmailAsync(email);
+                string email = model.Email.Trim();
 
-            if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
-            {
-                IList<string>? userRoles = await _userManager.GetRolesAsync(user);
-
-                if (string.IsNullOrEmpty(user.Email) || string.IsNullOrWhiteSpace(user.Email))
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(model.Password))
                 {
                     return BadRequest(new ResponseBody<string>
                     {
                         Body = null,
-                        Message = "Email is null",
+                        Message = "Email and Password must be provided.",
                         Success = false,
                         Timestamp = DateTimeOffset.Now,
                         StatusCode = 400,
                     });
                 }
 
-                List<Claim>? authClaims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.Name, user.UserName!),
-                    new Claim(ClaimTypes.Sid, user.Id!),
-                    new Claim(ClaimTypes.Email, user.Email.Trim()),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-                };
+                ApplicationUser? user = await _userManager.FindByEmailAsync(email);
 
-                foreach (var userRole in userRoles)
+                if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
                 {
-                    authClaims.Add(new Claim(ClaimTypes.Role, userRole));
+                    IList<string>? userRoles = await _userManager.GetRolesAsync(user);
+
+                    if (string.IsNullOrEmpty(user.Email) || string.IsNullOrWhiteSpace(user.Email))
+                    {
+                        return BadRequest(new ResponseBody<string>
+                        {
+                            Body = null,
+                            Message = "Email is null",
+                            Success = false,
+                            Timestamp = DateTimeOffset.Now,
+                            StatusCode = 400,
+                        });
+                    }
+
+                    List<Claim>? authClaims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.Name, user.UserName!),
+                        new Claim(ClaimTypes.Sid, user.Id!),
+                        new Claim(ClaimTypes.Email, user.Email.Trim()),
+                        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                    };
+
+                    foreach (var userRole in userRoles)
+                    {
+                        authClaims.Add(new Claim(ClaimTypes.Role, userRole));
+                    }
+
+                    JwtSecurityToken? token = _tokenService.GenerateAccessToken(authClaims, _configuration);
+                    string? refreshToken = _tokenService.GenerateRefreshToken();
+
+                    _ = int.TryParse(_configuration["jwt:RefreshTokenValidityInMinutes"], out int refreshTokenValidity);
+
+                    user.RefreshToken = refreshToken;
+                    user.RefreshTokenExpiryTime = DateTime.UtcNow.AddMinutes(refreshTokenValidity);
+                    await _userManager.UpdateAsync(user);
+
+                    return Ok(new ResponseBody<Tokens>
+                    {
+                        Body = new Tokens
+                        {
+                            Token = new JwtSecurityTokenHandler().WriteToken(token),
+                            RefreshToken = refreshToken,
+                            ExpirationToken = token.ValidTo
+                        },
+                        Message = "Welcome",
+                        StatusCode = 200,
+                        Timestamp = DateTimeOffset.Now,
+                        Success = true
+                    });
                 }
 
-                JwtSecurityToken? token = _tokenService.GenerateAccessToken(authClaims, _configuration);
-                string? refreshToken = _tokenService.GenerateRefreshToken();
-
-                _ = int.TryParse(_configuration["jwt:RefreshTokenValidityInMinutes"], out int refreshTokenValidity);
-
-                user.RefreshToken = refreshToken;
-                user.RefreshTokenExpiryTime = DateTime.UtcNow.AddMinutes(refreshTokenValidity);
-                await _userManager.UpdateAsync(user);
-
-                return Ok(new Tokens
+                return Unauthorized(new ResponseBody<string>
                 {
-                    Token = new JwtSecurityTokenHandler().WriteToken(token),
-                    RefreshToken = refreshToken,
-                    ExpirationToken = token.ValidTo
+                    Body = null,
+                    Message = "Invalid email or password.",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = 401,
                 });
             }
-
-            return Unauthorized(new ResponseBody<string>{
-                Body = null,
-                Message = "Invalid email or password.",
-                Success = false,
-                Timestamp = DateTimeOffset.Now,
-                StatusCode = 401,
-            });
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error to log user! Please try again later",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                });
+            }
         }
 
         [HttpPost("register")]
@@ -234,83 +257,98 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<ValidationErrors>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ResponseBody<Tokens>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> RefreshToken([FromBody] TokenDto tokenModel)
         {
-            if (!ModelState.IsValid)
+            try 
             {
-                ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
-                return BadRequest(errorResponse);
-            }
-
-            if (tokenModel is null || string.IsNullOrWhiteSpace(tokenModel.AcessToken) || string.IsNullOrWhiteSpace(tokenModel.RefreshToken))
-            {    
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Invalid client request",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 400,
-                });
-            }
-
-            ClaimsPrincipal? principal = _tokenService.GetPrincipalFromExpiredToken(tokenModel.AcessToken, _configuration);
-
-            if (principal == null)
-            {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Invalid access token or refresh token",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 400,
-                });
-            }
-
-            string? username = principal.Identity?.Name;
-
-            if (string.IsNullOrWhiteSpace(username))
-            {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Invalid token data",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 400,
-                });
-            }
-
-            ApplicationUser? user = await _userManager.FindByNameAsync(username);
-
-            if (user == null || user.RefreshToken != tokenModel.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.Now)
-            {
-                return BadRequest(new ResponseBody<string>{
-                    Body = null,
-                    Message = "Invalid access token or refresh token",
-                    Success = false,
-                    Timestamp = DateTimeOffset.Now,
-                    StatusCode = 400,
-                });
-            }
-
-            JwtSecurityToken? newAccessToken = _tokenService.GenerateAccessToken(principal.Claims.ToList(), _configuration);
-            string? newRefreshToken = _tokenService.GenerateRefreshToken();
-
-            user.RefreshToken = newRefreshToken;
-            await _userManager.UpdateAsync(user);
-
-            return Ok(new ResponseBody<Tokens>
-            {
-                Body = new Tokens
+                if (!ModelState.IsValid)
                 {
-                    Token = new JwtSecurityTokenHandler().WriteToken(newAccessToken),
-                    RefreshToken = newRefreshToken,
-                    ExpirationToken = newAccessToken.ValidTo
-                },
-                Message = "Token created",
-                Success = true,
-                Timestamp = DateTimeOffset.Now,
-                StatusCode = 200,
-            });
+                    ResponseBody<ValidationErrors> errorResponse = CreateErrorResponse(ModelState);
+                    return BadRequest(errorResponse);
+                }
+
+                if (tokenModel is null || string.IsNullOrWhiteSpace(tokenModel.AcessToken) || string.IsNullOrWhiteSpace(tokenModel.RefreshToken))
+                {    
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Invalid client request",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 400,
+                    });
+                }
+
+                ClaimsPrincipal? principal = _tokenService.GetPrincipalFromExpiredToken(tokenModel.AcessToken, _configuration);
+
+                if (principal == null)
+                {
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Invalid access token or refresh token",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 400,
+                    });
+                }
+
+                string? username = principal.Identity?.Name;
+
+                if (string.IsNullOrWhiteSpace(username))
+                {
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Invalid token data",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 400,
+                    });
+                }
+
+                ApplicationUser? user = await _userManager.FindByNameAsync(username);
+
+                if (user == null || user.RefreshToken != tokenModel.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.Now)
+                {
+                    return BadRequest(new ResponseBody<string>{
+                        Body = null,
+                        Message = "Invalid access token or refresh token",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 400,
+                    });
+                }
+
+                JwtSecurityToken? newAccessToken = _tokenService.GenerateAccessToken(principal.Claims.ToList(), _configuration);
+                string? newRefreshToken = _tokenService.GenerateRefreshToken();
+
+                user.RefreshToken = newRefreshToken;
+                await _userManager.UpdateAsync(user);
+
+                return Ok(new ResponseBody<Tokens>
+                {
+                    Body = new Tokens
+                    {
+                        Token = new JwtSecurityTokenHandler().WriteToken(newAccessToken),
+                        RefreshToken = newRefreshToken,
+                        ExpirationToken = newAccessToken.ValidTo
+                    },
+                    Message = "Token created",
+                    Success = true,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = 200,
+                });
+            }
+            catch (Exception e)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the create a token! Please try again later",
+                    Success = false,
+                    Timestamp = DateTimeOffset.Now,
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                });
+            }
         }
 
         [HttpPost]
@@ -319,45 +357,60 @@ namespace TodoListJwt.Controllers
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseBody<string>), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Revoke()
         {
-            string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
-
-            if (string.IsNullOrWhiteSpace(id)) 
+            try 
             {
-                return Unauthorized(new ResponseBody<string>{
+                string? id = User.FindFirst(ClaimTypes.Sid)?.Value;
+
+                if (string.IsNullOrWhiteSpace(id)) 
+                {
+                    return Unauthorized(new ResponseBody<string>{
+                        Body = null,
+                        Message = "you are not logged in",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 401,
+                    });
+                }
+
+                ApplicationUser? user = await _userManager.FindByIdAsync(id);
+
+                if (user == null) 
+                {
+                    return NotFound(new ResponseBody<string>{
+                        Body = null,
+                        Message = "User not found",
+                        Success = false,
+                        Timestamp = DateTimeOffset.Now,
+                        StatusCode = 404,
+                    });
+                }
+
+                user.RefreshToken = null;
+
+                await _userManager.UpdateAsync(user);
+
+                return StatusCode(StatusCodes.Status200OK, new ResponseBody<string>{
                     Body = null,
-                    Message = "you are not logged in",
-                    Success = false,
+                    Message = "Bye bye",
+                    Success = true,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 401,
+                    StatusCode = 200,
                 });
             }
-
-            ApplicationUser? user = await _userManager.FindByIdAsync(id);
-
-            if (user == null) 
+            catch (Exception e)
             {
-                return NotFound(new ResponseBody<string>{
-                    Body = null,
-                    Message = "User not found",
+                return StatusCode(StatusCodes.Status500InternalServerError, new ResponseBody<string>
+                {
+                    Body = e.Message,
+                    Message = "Error the to revoke! Please try again later",
                     Success = false,
                     Timestamp = DateTimeOffset.Now,
-                    StatusCode = 404,
+                    StatusCode = StatusCodes.Status500InternalServerError,
                 });
             }
-
-            user.RefreshToken = null;
-
-            await _userManager.UpdateAsync(user);
-
-            return StatusCode(StatusCodes.Status200OK, new ResponseBody<string>{
-                Body = null,
-                Message = "Bye bye",
-                Success = true,
-                Timestamp = DateTimeOffset.Now,
-                StatusCode = 200,
-            });
         }
 
         private ResponseBody<ValidationErrors> CreateErrorResponse(ModelStateDictionary modelState)
